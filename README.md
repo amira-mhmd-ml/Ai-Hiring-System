@@ -10,11 +10,27 @@ CV Analyzer Agent  ->  Interview Agent  ->  Scoring Agent  ->  Report Writer
                       LangGraph Orchestrator
 ```
 
+## Screenshots
+
+**Upload CVs**
+![Upload CVs](assets/image.png)
+
+**Interview in Progress**
+![Interview in Progress](assets/q-streamlite.png)
+
+**Final Report — Streamlit**
+![Final Report](assets/image5.png)
+
+**API Documentation (Swagger)**
+![API Docs](assets/API%20Docs%20(Swagger).png)
+
+---
+
 ## Setup
 
 ### Clone the repository
 ```bash
-git clone https://github.com/amira-mhmd-ml/AI-Hiring-System.git
+git clone https://github.com/yourusername/AI-Hiring-System.git
 cd AI-Hiring-System
 ```
 
@@ -49,10 +65,13 @@ http://localhost:8000/docs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/upload-cvs` | Upload CVs and job description |
-| POST | `/analyze/{id}` | Start the analysis pipeline |
-| GET | `/status/{id}` | Check processing status |
+| POST | `/analyze/{id}` | Analyze CVs and start the first interview, returns the first question |
+| POST | `/interview/{id}/answer` | Submit an answer; returns the next question, or moves to the next candidate, or triggers scoring once all candidates are done |
+| GET | `/status/{id}` | Check session status (`interviewing`, `scoring`, `complete`, `failed`) |
 | GET | `/report/{id}` | Get the final report |
 | GET | `/health` | Server health check |
+
+The interview is interactive by design: each call to `/analyze` or `/interview/{id}/answer` returns one question and waits for the next HTTP request with the candidate's answer, rather than running the whole interview in one blocking call.
 
 ## Running the Demo
 
@@ -143,6 +162,15 @@ It treats the interview as a graph with a real decision point (`receive_answer -
 
 **Known trade-off**
 LangGraph adds a real learning curve and another abstraction layer on top of LangChain. For a strictly linear, no-loop pipeline (for example, a simple RAG Q&A), it would be unnecessary overhead. The decision only pays off because this system genuinely needs loops and conditional stopping, not because LangGraph is always "better."
+
+## Known Limitations
+
+This project is functional end-to-end, but the following gaps are known and not silently ignored:
+
+- **No persistent database yet**: sessions are stored in an in-memory Python dict (`sessions = {}` in `main.py`). This works for a local demo but means all data is lost on server restart. A PostgreSQL schema is designed (see Architecture) but not yet wired in.
+- **Interview flow lacks dedicated tests**: the 27 automated tests in `tests/` cover CV parsing, scoring logic, and orchestrator routing. The interactive interview flow (`start_interview` / `submit_answer` in `interview_agent.py`), which uses LangGraph's `MemorySaver` to pause and resume between questions, does not yet have its own test coverage.
+- **No authentication on the API**: any client can call `/upload-cvs` and submit CVs. For a real deployment, this would need an auth layer (API keys or OAuth) before going further than a personal demo.
+- **CV retention policy is documented, not automated**: the README states a 7-day retention policy for uploaded CVs (see Privacy section), but the actual scheduled deletion job is not implemented yet — currently a manual cleanup task.
 
 ## Key Technologies
 

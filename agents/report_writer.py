@@ -27,8 +27,8 @@ async def generate_hiring_report(
     ranked_candidates: List[CandidateScore]
 ) -> HiringReport:
     llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash", # نسخة pro قوية في صياغة التقارير الطويلة وضمان سلامة الـ JSON المتوقع للـ UI
-    google_api_key=os.getenv("GEMINI_API_KEY"),
+    model="gemini-2.5-flash", 
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
     temperature=0.2
 )
 

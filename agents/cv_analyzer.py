@@ -26,8 +26,8 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 def build_cv_analyzer_chain():
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",  
-        google_api_key=os.getenv("GEMINI_API_KEY"),
+        model="gemini-2.5-flash",
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0
     )
 

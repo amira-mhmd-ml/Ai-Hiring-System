@@ -25,12 +25,12 @@ async def score_candidate(
 ) -> CandidateScore:
 
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",  # يُفضل استخدام نسخة pro هنا لأنها أقوى في التعامل مع الـ Structured Output والدرجات الحسابية
-        google_api_key=os.getenv("GEMINI_API_KEY"),
+        model="gemini-2.5-flash",  
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0
 )
 
-# سطر الـ chain سيعمل تلقائياً دون تعديل:
+
 
 
     formatted_qa = "\n\n".join([

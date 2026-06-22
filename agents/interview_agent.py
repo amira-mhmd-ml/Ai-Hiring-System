@@ -1,9 +1,11 @@
+
 import asyncio
+import os
 from typing import List, TypedDict
 from langchain_google_genai import ChatGoogleGenerativeAI
-import os
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from agents.cv_analyzer import CVAnalysis
 
@@ -20,11 +22,12 @@ class InterviewState(TypedDict):
 
 
 async def generate_question_node(state: InterviewState) -> InterviewState:
+
     llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=os.getenv("GEMINI_API_KEY"),
-    temperature=0.4 # درجة حرارة أعلى قليلاً لإعطاء مرونة وإبداع في صياغة أسئلة المقابلة
-)
+        model="gemini-2.5-flash",
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        temperature=0.7
+    )
 
     questions_so_far = "\n".join(state["questions_asked"]) or "None yet"
     last_answer = state["answers_given"][-1] if state["answers_given"] else "Interview just started"
@@ -34,7 +37,7 @@ async def generate_question_node(state: InterviewState) -> InterviewState:
             "system",
             """You are a professional senior technical interviewer.
             Generate ONE smart, specific interview question.
-            
+
             Rules:
             - Ask only ONE question per turn
             - Make it specific to this candidate's background AND the job requirements
@@ -48,15 +51,15 @@ async def generate_question_node(state: InterviewState) -> InterviewState:
             "human",
             """
             Job Requirements: {job_description}
-            
+
             Candidate Background: {cv_analysis}
-            
+
             Questions Asked So Far:
             {questions_so_far}
-            
+
             Last Answer Given:
             {last_answer}
-            
+
             Generate the next interview question:
             """
         )
@@ -86,58 +89,39 @@ async def generate_question_node(state: InterviewState) -> InterviewState:
     }
 
 
-async def receive_answer_node(state: InterviewState) -> InterviewState:
-    print(f"\n Question: {state['current_question']}")
-    print("─" * 50)
-
-    answer = input("👤 Candidate Answer: ").strip()
-
-    if not answer:
-        answer = "No answer provided"
-
-    return {
-        **state,
-        "answers_given": state["answers_given"] + [answer]
-    }
-
-
 def should_continue_interview(state: InterviewState) -> str:
     if state["interview_complete"]:
         return "end"
-    return "generate_question"
-
+    return "end"  
 
 def build_interview_graph():
     graph = StateGraph(InterviewState)
-
     graph.add_node("generate_question", generate_question_node)
-    graph.add_node("receive_answer", receive_answer_node)
-
     graph.set_entry_point("generate_question")
+    graph.add_edge("generate_question", END)
 
-    graph.add_edge("generate_question", "receive_answer")
-
-    graph.add_conditional_edges(
-        "receive_answer",
-        should_continue_interview,
-        {
-            "generate_question": "generate_question",
-            "end": END
-        }
-    )
-
-    return graph.compile()
+    memory = MemorySaver()
+    return graph.compile(checkpointer=memory)
 
 
-async def run_interview(
+_interview_graph = None
+
+
+def get_interview_graph():
+    global _interview_graph
+    if _interview_graph is None:
+        _interview_graph = build_interview_graph()
+    return _interview_graph
+
+
+
+async def start_interview(
+    session_id: str,
     cv_analysis: CVAnalysis,
     job_description: str
-) -> List[dict]:
-    print(f"\n{'='*50}")
-    print(f"Starting interview for: {cv_analysis.candidate_name}")
-    print(f"{'='*50}")
+) -> dict:
 
-    interview_graph = build_interview_graph()
+    graph = get_interview_graph()
 
     initial_state: InterviewState = {
         "candidate_name": cv_analysis.candidate_name,
@@ -158,34 +142,71 @@ async def run_interview(
         "qa_pairs": []
     }
 
-    final_state = await interview_graph.ainvoke(initial_state)
+    config = {"configurable": {"thread_id": session_id}}
+    result_state = await graph.ainvoke(initial_state, config)
 
-    print(f"\n Interview completed for {cv_analysis.candidate_name}")
-    return final_state["qa_pairs"]
+    return {
+        "question": result_state["current_question"],
+        "complete": result_state["interview_complete"],
+        "question_number": len(result_state["questions_asked"])
+    }
+
+
+async def submit_answer(session_id: str, answer: str) -> dict:
+
+    graph = get_interview_graph()
+    config = {"configurable": {"thread_id": session_id}}
+
+    current_snapshot = await graph.aget_state(config)
+    current_state = current_snapshot.values
+
+    updated_state = {
+        **current_state,
+        "answers_given": current_state["answers_given"] + [answer]
+    }
+
+    result_state = await graph.ainvoke(updated_state, config)
+
+    if result_state["interview_complete"]:
+        return {
+            "complete": True,
+            "qa_pairs": result_state["qa_pairs"]
+        }
+
+    return {
+        "complete": False,
+        "question": result_state["current_question"],
+        "question_number": len(result_state["questions_asked"])
+    }
 
 
 if __name__ == "__main__":
-    from agents.cv_analyzer import CVAnalysis
+    async def terminal_demo():
+        sample_cv = CVAnalysis(
+            candidate_name="Sara Ahmed",
+            years_of_experience=3,
+            technical_skills=["Python", "LangChain", "FastAPI", "PostgreSQL"],
+            education="BSc Computer Science",
+            previous_roles=["AI Engineer", "Backend Developer"],
+            strength_summary="Strong in LLM applications and API development",
+            weakness_summary="Limited experience with large-scale distributed systems"
+        )
 
-    sample_cv = CVAnalysis(
-        candidate_name="Sara Ahmed",
-        years_of_experience=3,
-        technical_skills=["Python", "LangChain", "FastAPI", "PostgreSQL"],
-        education="BSc Computer Science",
-        previous_roles=["AI Engineer", "Backend Developer"],
-        strength_summary="Strong in LLM applications and API development",
-        weakness_summary="Limited experience with large-scale distributed systems"
-    )
+        job_desc = """
+        Senior AI Engineer
+        Requirements: LangChain, LangGraph, FastAPI, Production AI Systems, 4+ years experience
+        """
 
-    job_desc = """
-    Senior AI Engineer
-    Requirements: LangChain, LangGraph, FastAPI, Production AI Systems, 4+ years experience
-    Responsibilities: Build and deploy AI agents, design multi-agent systems
-    """
+        session_id = "terminal-test-session"
+        result = await start_interview(session_id, sample_cv, job_desc)
 
-    qa_pairs = asyncio.run(run_interview(sample_cv, job_desc))
+        while not result["complete"]:
+            print(f"\nQuestion {result['question_number']}: {result['question']}")
+            answer = input("Your answer: ").strip()
+            result = await submit_answer(session_id, answer)
 
-    print("\n Interview Summary:")
-    for i, pair in enumerate(qa_pairs, 1):
-        print(f"\nQ{i}: {pair['question']}")
-        print(f"A{i}: {pair['answer']}")
+        print("\nInterview complete. Q&A pairs:")
+        for pair in result["qa_pairs"]:
+            print(f"Q: {pair['question']}\nA: {pair['answer']}\n")
+
+    asyncio.run(terminal_demo())
