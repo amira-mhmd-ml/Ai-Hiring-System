@@ -30,7 +30,7 @@ CV Analyzer Agent  ->  Interview Agent  ->  Scoring Agent  ->  Report Writer
 
 ### Clone the repository
 ```bash
-git clone https://github.com/yourusername/AI-Hiring-System.git
+git clone https://github.com/amira-mhmd-ml/AI-Hiring-System.git
 cd AI-Hiring-System
 ```
 
