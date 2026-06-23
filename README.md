@@ -13,7 +13,7 @@ CV Analyzer Agent  ->  Interview Agent  ->  Scoring Agent  ->  Report Writer
 ## Screenshots
 
 **Step 1 — Upload CVs and Job Description**
-![Upload CVs](assets/image.png)
+![Upload CVs](assets/image1.png)
 
 **Step 2 — AI Interview in Progress (real-time Q&A per candidate)**
 ![Interview in Progress](assets/image18.png)
@@ -33,8 +33,8 @@ CV Analyzer Agent  ->  Interview Agent  ->  Scoring Agent  ->  Report Writer
 
 ### Clone the repository
 ```bash
-git clone https://github.com/amira-mhmd-ml/AI-Hiring-System.git
-cd AI-Hiring-System
+git clone https://github.com/amira-mhmd-ml/ai-hiring-system.git
+cd ai-hiring-system
 ```
 
 ### 1. Activate the virtual environment
